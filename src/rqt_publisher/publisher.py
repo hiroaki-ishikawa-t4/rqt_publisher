@@ -44,6 +44,7 @@ from rclpy.qos import QoSProfile
 from rosidl_runtime_py.utilities import get_message
 
 from rqt_gui_py.plugin import Plugin
+from rqt_py_common.topic_helpers import get_field_type
 
 from .publisher_widget import PublisherWidget
 
@@ -213,6 +214,45 @@ class Publisher(Plugin):
                 publisher_info['timer'].start(int(1000.0 / publisher_info['rate']))
         # make sure the column value reflects the actual rate
         return '%.2f' % publisher_info['rate']
+
+    def _change_publisher_expression(self, publisher_info, topic_name, new_value):
+        expression = str(new_value)
+        if len(expression) == 0:
+            if topic_name in publisher_info['expressions']:
+                del publisher_info['expressions'][topic_name]
+                # qDebug(
+                #   'Publisher._change_publisher_expression(): removed expression'
+                #   'for: %s' % (topic_name))
+        else:
+            slot_type, is_array = get_field_type(topic_name, node=self._node)
+            if is_array:
+                slot_type = list
+            # strip possible trailing error message from expression
+            error_prefix = '# error'
+            error_prefix_pos = expression.find(error_prefix)
+            if error_prefix_pos >= 0:
+                expression = expression[:error_prefix_pos]
+            success, _ = self._evaluate_expression(expression, slot_type)
+            if success:
+                old_expression = publisher_info['expressions'].get(topic_name, None)
+                publisher_info['expressions'][topic_name] = expression
+                # print('Publisher._change_publisher_expression(): topic: %s, type: %s,'
+                #   'expression: %s') % (topic_name, slot_type, new_value)
+                self._fill_message_slots(
+                    publisher_info['message_instance'], publisher_info['topic_name'],
+                    publisher_info['expressions'], publisher_info['counter'])
+                # try:
+                #     publisher_info['message_instance']._check_types()
+                # except Exception as e:
+                #     print('serialization error: %s' % e)
+                #     if old_expression is not None:
+                #         publisher_info['expressions'][topic_name] = old_expression
+                #     else:
+                #         del publisher_info['expressions'][topic_name]
+                #     return '%s %s: %s' % (expression, error_prefix, e)
+                return expression
+            else:
+                return '%s %s evaluating as "%s"' % (expression, error_prefix, slot_type.__name__)
 
     def _extract_array_info(self, type_str):
         array_size = None
