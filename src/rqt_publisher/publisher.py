@@ -87,7 +87,7 @@ class Publisher(Plugin):
 
         # create context for the expression eval statement
         self._eval_locals = {'i': 0}
-        self._eval_locals["now"] = self._get_time
+        self._eval_locals["now"] = self._get_time()
         for module in (math, random, time):
             self._eval_locals.update(module.__dict__)
         del self._eval_locals['__name__']
@@ -338,6 +338,7 @@ class Publisher(Plugin):
                 message_type = type(message)
 
             self._eval_locals['i'] = counter
+            self._eval_locals['now'] = self._get_time()
             success, value = self._evaluate_expression(expressions[topic_name], message_type)
             if not success:
                 value = message_type()
